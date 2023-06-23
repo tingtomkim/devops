@@ -1,0 +1,208 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  annotations:
+    meta.helm.sh/release-name: prometheus
+    meta.helm.sh/release-namespace: monitor
+    prometheus-operator-validated: "true"
+  labels:
+    app: kube-prometheus-stack
+    app.kubernetes.io/instance: prometheus
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: kube-prometheus-stack
+    app.kubernetes.io/version: 41.7.3
+    chart: kube-prometheus-stack-41.7.3
+    heritage: Helm
+    release: prometheus
+  name: add-rule
+  namespace: monitor
+spec:
+  groups:
+  - name: add-rule
+    rules:
+      #    - alert: test-KubePodNotReady
+      #      annotations:
+      #        description: 'Pod {{`{{`}} $labels.namespace {{`}}`}}/{{`{{`}} $labels.pod {{`}}`}} has been in a non-ready state for longer than 2 minutes.'
+      #        runbook_url: 'https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubepodnotready'
+      #        summary: 'Pod has been in a non-ready state for more than 2 minutes.'
+      #      expr: |-
+      #        sum by (namespace, pod, cluster) (
+      #          max by(namespace, pod, cluster) (
+      #            kube_pod_status_phase{job="kube-state-metrics", namespace=~".*", phase=~"Pending|Unknown|Failed"}
+      #          ) * on(namespace, pod, cluster) group_left(owner_kind) topk by(namespace, pod, cluster) (
+      #            1, max by(namespace, pod, owner_kind, cluster) (kube_pod_owner{owner_kind!="Job"})
+      #          )
+      #        ) > 0
+      #      #for: 2m
+      #      labels:
+      #        severity: warning
+    - alert: InstanceDown
+      expr: up == 0
+      for: 2m
+      labels:
+        severity: "critical"
+      annotations:
+        title: "Instance {{`{{`}} $labels.instance {{`}}`}} down"
+        summary: "Endpoint {{`{{`}} $labels.instance {{`}}`}}"
+        identifier: "{{`{{`}} $labels.instance {{`}}`}}"
+        description: "{{`{{`}} $labels.instance {{`}}`}} of job {{`{{`}} $labels.job {{`}}`}} has been down for more than 2 minutes."
+    - alert: HostOutOfMemory
+      expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 10
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Host out of memory (instance {{`{{`}} $labels.instance {{`}}`}})"
+        description: "Node memory is filling up (< 10% left)\n  VALUE = {{`{{`}} $value {{`}}`}}\n  LABELS: {{`{{`}} $labels {{`}}`}}"
+    - alert: HostMemoryUnderMemoryPressure
+      expr: rate(node_vmstat_pgmajfault[1m]) > 1000
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Host memory under memory pressure (instance {{`{{`}} $labels.instance {{`}}`}})"
+        description: "The node is under heavy memory pressure. High rate of major page faults\n  VALUE = {{`{{`}} $value {{`}}`}}\n  LABELS: {{`{{`}} $labels {{`}}`}}"
+  # Please add ignored mountpoints in node_exporter parameters like
+  # "--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|run)($|/)".
+  # Same rule using "node_filesystem_free_bytes" will fire when disk fills for non-root users.
+    - alert: HostOutOfDiskSpace
+      expr: (node_filesystem_avail_bytes * 100) / node_filesystem_size_bytes < 10 and ON (instance, device, mountpoint) node_filesystem_readonly == 0
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Host out of disk space (instance {{`{{`}} $labels.instance {{`}}`}})"
+        description: "Disk is almost full (< 10% left)\n  VALUE = {{`{{`}} $value {{`}}`}}\n  LABELS: {{`{{`}} $labels {{`}}`}}"
+    - alert: HostHighCpuLoad
+      expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 80
+      for: 0m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Host high CPU load (instance {{`{{`}} $labels.instance {{`}}`}})"
+        description: "CPU load is > 80%\n  VALUE = {{`{{`}} $value {{`}}`}}\n  LABELS: {{`{{`}} $labels {{`}}`}}"
+    - alert: HostHighCpuLoad1
+      expr: (sum by (instance) (avg by (mode, instance) (rate(node_cpu_seconds_total{mode!="idle"}[2m]))) > 0.8) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}
+      for: 0m
+      labels:
+        severity: warning
+      annotations:
+        summary: Host high CPU load (instance {{`{{`}} $labels.instance {{`}}`}})
+        description: "CPU load is > 80%\n  VALUE = {{`{{`}} $value {{`}}`}}\n  LABELS = {{`{{`}} $labels {{`}}`}}"
+    - alert: HostCpuHighIowait
+      expr: (avg by (instance) (rate(node_cpu_seconds_total{mode="iowait"}[5m])) * 100 > 10) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}
+      for: 0m
+      labels:
+        severity: warning
+      annotations:
+        summary: Host CPU high iowait (instance {{`{{`}} $labels.instance {{`}}`}})
+        description: "CPU iowait > 10%. A high iowait means that you are disk or network bound.\n  VALUE = {{`{{`}} $value {{`}}`}}\n  LABELS = {{`{{`}} $labels {{`}}`}}"
+    - alert: HostOutOfMemory
+      expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 20) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: Host out of memory (instance {{`{{`}} $labels.instance {{`}}`}})
+        description: "Node memory is filling up (< 20% left)\n  VALUE = {{`{{`}} $value {{`}}`}}\n  LABELS = {{`{{`}} $labels {{`}}`}}"
+    # Please add ignored mountpoints in node_exporter parameters like
+    # "--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|run)($|/)".
+    # Same rule using "node_filesystem_free_bytes" will fire when disk fills for non-root users.
+    - alert: HostOutOfDiskSpace
+      expr: ((node_filesystem_avail_bytes * 100) / node_filesystem_size_bytes < 20 and ON (instance, device, mountpoint) node_filesystem_readonly == 0) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: Host out of disk space (instance {{`{{`}} $labels.instance {{`}}`}})
+        description: "Disk is almost full (< 10% left)\n  VALUE = {{`{{`}} $value {{`}}`}}\n  LABELS = {{`{{`}} $labels {{`}}`}}"
+    - alert: HostUnusualDiskReadRate
+      expr: (sum by (instance) (rate(node_disk_read_bytes_total[2m])) / 1024 / 1024 > 50) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: Host unusual disk read rate (instance {{`{{`}} $labels.instance {{`}}`}})
+        description: "Disk is probably reading too much data (> 50 MB/s)\n  VALUE = {{`{{`}} $value {{`}}`}}\n  LABELS = {{`{{`}} $labels {{`}}`}}"
+    - alert: HostUnusualDiskWriteRate
+      expr: (sum by (instance) (rate(node_disk_written_bytes_total[2m])) / 1024 / 1024 > 50) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: Host unusual disk write rate (instance {{`{{`}} $labels.instance {{`}}`}})
+        description: "Disk is probably writing too much data (> 50 MB/s)\n  VALUE = {{`{{`}} $value {{`}}`}}\n  LABELS = {{`{{`}} $labels {{`}}`}}"
+    - alert: HostUnusualNetworkThroughputIn
+      expr: (sum by (instance) (rate(node_network_receive_bytes_total[2m])) / 1024 / 1024 > 100) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: Host unusual network throughput in (instance {{`{{`}} $labels.instance {{`}}`}})
+        description: "Host network interfaces are probably receiving too much data (> 100 MB/s)\n  VALUE = {{`{{`}} $value {{`}}`}}\n  LABELS = {{`{{`}} $labels {{`}}`}}"
+    - alert: HostUnusualNetworkThroughputOut
+      expr: (sum by (instance) (rate(node_network_transmit_bytes_total[2m])) / 1024 / 1024 > 100) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: Host unusual network throughput out (instance {{`{{`}} $labels.instance {{`}}`}})
+        description: "Host network interfaces are probably sending too much data (> 100 MB/s)\n  VALUE = {{`{{`}} $value {{`}}`}}\n  LABELS = {{`{{`}} $labels {{`}}`}}"
+    - alert: ContainerCpuUsage
+      expr: (sum(rate(container_cpu_usage_seconds_total{name!=""}[3m])) BY (instance, name) * 100) > 80
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: Container CPU usage (instance {{`{{`}} $labels.instance {{`}}`}})
+        description: "Container CPU usage is above 80%\n  VALUE = {{`{{`}} $value {{`}}`}}\n  LABELS = {{`{{`}} $labels {{`}}`}}"
+    # See https://medium.com/faun/how-much-is-too-much-the-linux-oomkiller-and-used-memory-d32186f29c9d
+    - alert: ContainerMemoryUsage
+      expr: (sum(container_memory_working_set_bytes{name!=""}) BY (instance, name) / sum(container_spec_memory_limit_bytes > 0) BY (instance, name) * 100) > 80
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: Container Memory usage (instance {{`{{`}} $labels.instance {{`}}`}})
+        description: "Container Memory usage is above 80%\n  VALUE = {{`{{`}} $value {{`}}`}}\n  LABELS = {{`{{`}} $labels {{`}}`}}"
+    - alert: ContainerVolumeUsage
+      expr: (1 - (sum(container_fs_inodes_free{name!=""}) BY (instance) / sum(container_fs_inodes_total) BY (instance))) * 100 > 80
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: Container Volume usage (instance {{`{{`}} $labels.instance {{`}}`}})
+        description: "Container Volume usage is above 80%\n  VALUE = {{`{{`}} $value {{`}}`}}\n  LABELS = {{`{{`}} $labels {{`}}`}}"          
+    - alert: KubernetesMemoryPressure
+      expr: kube_node_status_condition{condition="MemoryPressure",status="true"} == 1
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: Kubernetes memory pressure (instance {{`{{`}} $labels.instance{{`}}`}})
+        description: "{{`{{`}} $labels.node{{`}}`}} has MemoryPressure condition\n  VALUE = {{`{{`}} $value{{`}}`}}\n  LABELS = {{`{{`}} $labels{{`}}`}}"
+    - alert: KubernetesDiskPressure
+      expr: kube_node_status_condition{condition="DiskPressure",status="true"} == 1
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: Kubernetes disk pressure (instance {{`{{`}} $labels.instance{{`}}`}})
+        description: "{{`{{`}} $labels.node{{`}}`}} has DiskPressure condition\n  VALUE = {{`{{`}} $value{{`}}`}}\n  LABELS = {{`{{`}} $labels{{`}}`}}"
+    - alert: KubernetesContainerOomKiller
+      expr: (kube_pod_container_status_restarts_total - kube_pod_container_status_restarts_total offset 10m >= 1) and ignoring (reason) min_over_time(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[10m]) == 1
+      for: 0m
+      labels:
+        severity: warning
+      annotations:
+        summary: Kubernetes container oom killer (instance {{`{{`}} $labels.instance{{`}}`}})
+        description: "Container {{`{{`}} $labels.container{{`}}`}} in pod {{`{{`}} $labels.namespace{{`}}`}}/{{`{{`}} $labels.pod{{`}}`}} has been OOMKilled {{`{{`}} $value{{`}}`}} times in the last 10 minutes.\n  VALUE = {{`{{`}} $value{{`}}`}}\n  LABELS = {{`{{`}} $labels{{`}}`}}"
+    - alert: KubernetesPersistentvolumeclaimPending
+      expr: kube_persistentvolumeclaim_status_phase{phase="Pending"} == 1
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: Kubernetes PersistentVolumeClaim pending (instance {{`{{`}} $labels.instance{{`}}`}})
+        description: "PersistentVolumeClaim {{`{{`}} $labels.namespace{{`}}`}}/{{`{{`}} $labels.persistentvolumeclaim{{`}}`}} is pending\n  VALUE = {{`{{`}} $value{{`}}`}}\n  LABELS = {{`{{`}} $labels{{`}}`}}"
+            
