@@ -1,0 +1,14 @@
+variable "name" {}
+variable "engine" {}
+variable "engine_version" {}
+variable "node_type" {}
+variable "parameter_group_name" {}
+variable "port" {}
+variable "subnet_ids" {}
+variable "vpc_id" {}
+variable "sg_id" {}
+variable "num_node_groups" {}
+variable "replicas_per_node_group" {}
+variable "automatic_failover_enabled" {}
+variable "multi_az_enabled" {}
+variable "snapshot_retention_limit" {}
