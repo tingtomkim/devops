@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    notifications.argoproj.io/subscribe.on-health-degraded.slack: deploy_notification
+    notifications.argoproj.io/subscribe.on-sync-running.slack: deploy_notification
+    notifications.argoproj.io/subscribe.on-sync-status-unknown.slack: deploy_notification
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: deploy_notification
+  name: service-prod-oauth2-proxy
+  namespace: argocd
+spec:
+  destination:
+    name: service-prod-eks
+    namespace: infra
+  project: service
+  source:
+    helm:
+      releaseName: oauth2-proxy
+      valueFiles:
+      - values-service-prod.yaml
+    path: oauth2-proxy
+    repoURL: git@github.com:service-charts.git

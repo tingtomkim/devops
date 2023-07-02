@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    notifications.argoproj.io/subscribe.on-health-degraded.slack: deploy_notification
+    notifications.argoproj.io/subscribe.on-sync-running.slack: deploy_notification
+    notifications.argoproj.io/subscribe.on-sync-status-unknown.slack: deploy_notification
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: deploy_notification
+  name: service-prod-aws-efs-csi-driver
+  namespace: argocd
+spec:
+  destination:
+    name: service-prod-eks
+    namespace: kube-system
+  project: service
+  source:
+    helm:
+      releaseName: aws-efs-csi-driver
+    path: aws-efs-csi-driver
+    repoURL: git@github.com:service-charts
